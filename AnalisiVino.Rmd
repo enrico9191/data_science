@@ -1,0 +1,317 @@
+---
+title: "Vino: domande e risposte"
+Author: Enrico Martin
+output:
+  ioslides_presentation:
+    smaller: false
+    incremental: yes
+    css: 'style.css'
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Presentazione del dataset analizzato
+
+Il progetto analizza un dataset sul mondo del vino.
+Il dataset, dopo la rimozione di due campi non utili 
+all'analisi, è così composto:
+
+- X 
+- country 
+- descripition
+- designation
+- points
+- price
+- province
+- region
+- taster_name
+- title
+- variety
+- winery
+
+Il numero di entrate (righe) è  120'975
+
+## Prezzo medio dei vini per paese I
+Valutato in funzione dei vini più volte recensiti
+
+```{r echo =FALSE, eval=TRUE}
+#------------------------------------------------------------------------------INCLUSIONE LIBRERIE
+library(dplyr)
+library(stringr)
+library("ggplot2")
+##------------------------------------------------------------------------------LETTURA DATASET ORIGINALE
+Wine <- read.csv("winemag-data-130k-v2.csv")
+##------------------------------------------------------------------------------RIDUZIONE DATASET
+##---------------------------------------------------------RIDUZIONE CAMPI VUOTI
+WineNew <- Wine %>% filter(!is.na(price))
+WineNew <- WineNew[, -9] 
+WineNew <- WineNew[, -10]
+WineNew = WineNew %>% rename( region=region_1)
+View(WineNew)
+##------------------------------------------------------------------------------QUERY
+##--------------------------------------------------Query_media_prezzo_per_paese
+avg_price_country <- WineNew %>% group_by(country) %>% 
+summarise(n=n(), prezzo_medio=signif(mean(price), digits = 4)) %>%
+arrange(desc(n))
+var1 <- head(avg_price_country, 10)              
+p <-ggplot(var1, aes(x=country, y=prezzo_medio, fill=prezzo_medio)) + ylab("Media Prezzi") + xlab("Paese")
+p<-p +expand_limits(y=c(0, (70)))
+p<-p+geom_bar(stat = "identity") + geom_text(aes(label=prezzo_medio), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#f1bd0d",high="#eea109")+ theme_minimal() 
+p
+
+```
+
+## Punteggio medio dei vini per paese I
+Valutato in funzione dei vini più volte recensiti
+
+```{r echo =FALSE, eval=TRUE}
+##----------------------------------------------Query_media_punteggio_per_paese
+avg_points_country <- WineNew %>% group_by(country) %>%
+summarise(n=n(), punteggio_medio=signif(mean(points), digits = 4)) %>%
+arrange(desc(n))
+var2<- head(avg_points_country, 10)
+k<-ggplot(var2, aes(x=country, y=punteggio_medio, fill=punteggio_medio)) + ylab("Media Punti") + xlab("Paese")+expand_limits(y=c(0, (95)))+ 
+  geom_bar(stat = "identity") + geom_text(aes(label=punteggio_medio), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#f1bd0d",high="#eea109")+ theme_minimal() 
+k
+```
+
+## Prezzo medio dei vini per paese II
+Valutato esclusivamente sulla media
+
+```{r echo =FALSE, eval=TRUE}
+##-------------------------------------------------Query_media_prezzo_per_paese2
+avg_price_country2 <- WineNew %>% group_by(country) %>% 
+summarise(n=n(), Prezzo_medio=signif(mean(price), digits = 4)) %>%
+arrange(desc(Prezzo_medio))
+var3<-head(avg_price_country2, 10)
+j<-ggplot(var3, aes(x=country, y=Prezzo_medio, fill=Prezzo_medio)) + ylab("Media Prezzi") + xlab("Paese")
+j<-j +expand_limits(y=c(0, (90)))
+j<-j+geom_bar(stat = "identity") + geom_text(aes(label=Prezzo_medio), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#f1bd0d",high="#eea109")+ theme_minimal() 
+j
+```
+
+## Punteggio medio dei vini per paese II
+Valutato esclusivamente sulla media
+
+```{r echo =FALSE, eval=TRUE}
+##---------------------------------------------Query_media_punteggio_per_paese2
+avg_points_country2 <- WineNew %>% group_by(country) %>%
+  filter(country != "") %>%
+summarise(n=n(), Prezzo_medio=signif(mean(points), digits = 4)) %>%
+arrange(desc(Prezzo_medio))
+#avg_points_country3 <- avg_points_country2 %>% filter(!is.na(country))
+var4 <- head(avg_points_country2, 10)
+i<-ggplot(var4, aes(x=country, y=Prezzo_medio, fill=Prezzo_medio)) + ylab("Media Punti") + xlab("Paese") + expand_limits(y=c(0, (95))) +
+  geom_bar(stat = "identity") + geom_text(aes(label=Prezzo_medio), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#f1bd0d",high="#eea109")+ theme_minimal() 
+i
+```
+
+## Eccellenze nel mondo
+*I vini suddivisi per paese che hanno preso il massimo del punteggio*
+
+```{r echo =FALSE, eval=TRUE, comment=""}
+##---------------------------------------------------------------Query_100/100
+k = subset(WineNew, points==100, select = c(X,country, points, title)) 
+ecc= aggregate(X ~ country, k, FUN = length)
+colnames(ecc)[2] = "punteggio"
+## Calcolo percentuale
+ecc$fraction = ecc$punteggio / sum(ecc$punteggio)
+
+## Calcolo delle percentuali cumulative (percentuale attuale + somma percentuali stadi precedenti)
+ecc$ymax = cumsum(ecc$fraction)
+
+## 
+ecc$ymin = c(0, head(ecc$ymax, n=-1))
+ ## Calcola la posizione dell etichetta
+ecc$labelPosition <- (ecc$ymax + ecc$ymin) / 2
+
+## 
+ecc$label <- paste0(ecc$country, "\n value: ", ecc$punteggio)  #paste0 -> Concatena i vettori dopo aver convertito in carattere
+## Grafico
+ggplot(ecc, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=country)) +
+     geom_rect() +
+     coord_polar(theta="y") +
+     scale_fill_brewer(palette=1) +
+     scale_color_brewer(palette=1) +
+     geom_label( x=4.10, aes(y=labelPosition, label=label), size=2.5) +
+     xlim(c(2, 4)) +
+     theme_void() + theme(legend.position = "none")
+k2 = subset(WineNew, points==100, select = c(country, title))
+k2 <- k2[, -1]
+k2
+
+
+
+```
+
+## Varietà di uvaggi utilizzati
+
+```{r echo =FALSE, eval=TRUE, comment=""}
+
+newvar <- WineNew %>% select(X, country, variety)
+newvar <- newvar %>% count(variety) %>%group_by(variety) %>% arrange(desc(n)) %>% mutate(lab.ypos = cumsum(n) - 0.5*n)
+newvar <- head(newvar, 10)
+
+## Calcolo percentuali
+newvar$fraction = newvar$n / sum(newvar$n)
+
+## Calcolo le percentuali cumulative
+newvar$ymax = cumsum(newvar$fraction)
+
+
+newvar$ymin = c(0, head(newvar$ymax, n=-1))
+## Calcolo la  posizione dell'etichetta
+newvar$labelPosition <- (newvar$ymax + newvar$ymin) / 2
+
+
+newvar$label <- paste0(newvar$variety, "\n value: ", newvar$n)
+## Faccio il grafico
+ggplot(newvar, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=variety)) +
+     geom_rect() +
+     coord_polar(theta="y") +
+     geom_label( x=4.10, aes(y=labelPosition, label=label), size=2.5) +
+     xlim(c(2, 4)) +
+     theme_void() + theme(legend.position = "none")
+
+```
+
+## La media dei voti assegnati dai giudici
+I 5 giudici che hanno assegnato mediamente un punteggio più alto
+
+```{r echo =FALSE, eval=TRUE}
+avg_point_taster_d <- WineNew %>% group_by(taster_name) %>%
+summarise(n=n(), Media_punti=signif(mean(points), digits = 4)) %>%
+arrange(desc(Media_punti))
+var5 <- head(avg_point_taster_d, 5)
+kk<-ggplot(var5, aes(x=taster_name, y=Media_punti, fill=Media_punti)) + ylab("Media Punti") + xlab("Giudice")
+kk<-kk +expand_limits(y=c(0, (90)))
+kk<-kk+geom_bar(stat = "identity") + geom_text(aes(label=Media_punti), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#19f805",high="#11a504")+ theme_minimal() 
+kk
+```
+
+I 5 giudici che hanno assegnato mediamente un punteggio più basso
+
+```{r echo =FALSE, eval=TRUE}
+avg_point_taster_a <-WineNew %>% group_by(taster_name) %>%
+summarise(n=n(), Media_punti=signif(mean(points), digits = 4)) %>%
+arrange(Media_punti)
+var6 <- head(avg_point_taster_a, 5)
+jj<-ggplot(var6, aes(x=taster_name, y=Media_punti, fill=Media_punti)) + ylab("Media Punti") + xlab("Giudice")
+jj<-jj +expand_limits(y=c(80, (100)))
+jj<-jj+geom_bar(stat = "identity") + geom_text(aes(label=Media_punti), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#19f805",high="#11a504")+ theme_minimal() 
+jj
+```
+
+## Vini e annate
+Le annate piu volte recensite
+```{r echo =FALSE, eval=TRUE, comment=""}
+n2 <- WineNew %>%  filter(str_detect(title, "20\\d\\d")) %>% 
+  mutate(anno = str_extract(title, "20\\d\\d"))
+n2 <- n2 %>% select(title, anno)
+n2 <- n2 %>% group_by(anno) %>% count(anno) %>% arrange(desc(n)) 
+n2 <- head(n2, 10)
+n2 <- ggplot(n2, aes(x =n, y = anno, label = n, colour = anno)) +
+        geom_segment(aes(x = 0, y = anno, xend = n, yend = anno)) +
+        geom_point(size = 5) 
+n2
+
+
+```
+
+## Eccellenze italiane
+I primi 10 vini italiani per punteggio assegnatogli
+
+```{r echo =FALSE, eval=TRUE, comment=""}
+top_vini_italia <- WineNew %>% filter(country=="Italy") %>% select(title, points) %>% arrange(desc(points))
+head(top_vini_italia, 10)
+```
+
+## Champagne VS Prosecco I
+*La media dei punteggi ottenuta dallo Champagne*
+
+```{r echo =FALSE, eval=TRUE, comment=""}
+avg_points_champagne <- WineNew %>% group_by(region) %>%
+summarise(n=n(), avarage=mean(points)) %>%
+arrange(desc(avarage)) %>% filter(region=="Champagne")
+var7 <-head((signif((avg_points_champagne[[3]]), digits = 4)), 1)
+var7
+```
+*La media dei punteggi ottenuta dal Prosecco*
+```{r echo =FALSE, eval=TRUE, comment=""}
+avg_points_prosecco <- WineNew %>% group_by(region) %>%
+summarise(n=n(), avarage= mean(points)) %>%
+arrange(desc(avarage)) %>% filter(str_detect(region, "Prosecco")) %>% 
+mutate(mediap = sum(avarage)/11)  %>% select(mediap)
+##head(avg_points_prosecco,1)
+var8 <- head((signif((avg_points_prosecco[[1]]), digits = 4)), 1)
+var8
+```
+*La media dei prezzi ottenuta dallo Champagne*
+```{r echo =FALSE, eval=TRUE, comment=""}
+avg_price_champagne <- WineNew %>% group_by(region) %>%
+summarise(n=n(), avarage=mean(price)) %>%
+arrange(desc(avarage)) %>% filter(region=="Champagne")
+var9 <- head((signif((avg_price_champagne[[3]]), digits = 4)), 1)
+var9
+```
+*La media dei prezzi ottenuta dal Prosecco*
+```{r echo =FALSE, eval=TRUE, comment=""}
+avg_price_prosecco <- WineNew %>% group_by(region) %>%
+summarise(n=n(), avarage= mean(price)) %>%
+arrange(desc(avarage)) %>% filter(str_detect(region, "Prosecco")) %>% 
+mutate(mediap = sum(avarage)/11)  %>% select(mediap)
+var10 <- head((signif((avg_price_prosecco[[1]]), digits = 4)), 1)
+var10
+```
+*Confronto grafico*
+```{r echo =FALSE, eval=TRUE, comment=""}
+Tipologia1 <- c(rep("Champagne", 1) , rep("Prosecco", 1))
+Punteggio <- c(rep(var7, 1), rep(var8, 1))
+data2 <- data.frame(Tipologia1, Punteggio)
+ggplot(data2, aes(y=Punteggio, x=Tipologia1, fill=Punteggio)) + ylab("Punteggio") + xlab("Tipologia")+
+expand_limits(y=c(0, (110))) + geom_bar(stat = "identity") + geom_text(aes(label=Punteggio), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#3d89f7",high="#0859d0")+ theme_minimal() 
+
+Tipologia2 <- c(rep("Champagne", 1) , rep("Prosecco", 1))
+Prezzo <- c(rep(var9, 1), rep(var10, 1))
+data3 <- data.frame(Tipologia2, Prezzo)
+ggplot(data3, aes(y=Prezzo, x=Tipologia2, fill=Prezzo)) + ylab("Prezzo") + xlab("Tipologia")+
+expand_limits(y=c(0, (110))) + geom_bar(stat = "identity") + geom_text(aes(label=Prezzo), vjust=-0.3, size=3.5) +scale_fill_gradient(low="#3d89f7",high="#0859d0")+ theme_minimal() 
+
+```
+
+## Champagne VS Prosecco II
+
+*Traguardi raggiunti*
+
+Solo lo Champagne riesce ad aggiudicarsi punteggi così importanti (98+)
+```{r echo =FALSE, eval=TRUE, comment=""}
+var11 <- WineNew %>% filter((str_detect(region, "Prosecco") | region=="Champagne") & points>=98) %>% select(title, points) %>% arrange(desc(points)) 
+var11
+
+```
+
+## Fine presentazione
+
+*Considerazioni*
+
+Quello che ho riscontrato durante l'analisi del mio dataset è stato
+spesso coerente con il mio sapere frutto della passione per il vino.
+Altri risultati hanno dato risultati inaspettati o per lo meno sono 
+stati meno interessanti di altri. E di conseguenza anche meno
+contestualizzabili.
+
+
+Enrico Martin
+
+
+
+
+
+
+
+
+
